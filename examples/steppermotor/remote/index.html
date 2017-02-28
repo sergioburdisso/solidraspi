@@ -1,0 +1,144 @@
+<html>
+<script type="text/javascript">
+	var raspiIpAddr = "192.168.0.106"
+	var ajax = new XMLHttpRequest()
+	var startMouse = {x:0, y:0};
+	var startOrientation = {alpha:0, beta:0, gamma:0};
+	var Orientation = false;
+
+	var $touch = document.getElementById("touch");
+	var $active_zone = document.getElementById("active_zone");
+	var $vector_touch = document.getElementById("vector_touch");
+	var $vector_orientation = document.getElementById("vector_orientation");
+	var $x = document.getElementById("x");
+	var $y = document.getElementById("y");
+	var $a = document.getElementById("a");
+	var $b = document.getElementById("b");
+	var $g = document.getElementById("g");
+	var $absolute = document.getElementById("absolute");
+
+	$active_zone.style.width = Math.min($touch.clientWidth/1.5, $touch.clientHeight/1.5);
+	$active_zone.style.height = $active_zone.style.width;
+
+	$touch.onmouseup = function(e){if (Orientation) return;
+		startMouse.x = startMouse.y = 0;
+		$active_zone.style.display="none";
+		$x.innerText= 0;
+		$y.innerText= 0;
+	}
+	$touch.onmousedown = function(e){
+		if (e["changedTouches"])
+			e = e.changedTouches[0];
+
+		if (Orientation || e.clientY < 100) return;
+
+		startMouse.x = e.clientX;
+		startMouse.y = e.clientY;
+
+		$active_zone.style.display ="block";
+		$active_zone.style.top = e.clientY - $active_zone.clientHeight/2;
+		$active_zone.style.left = e.clientX - $active_zone.clientWidth/2;
+		$active_zone.style.transform = "rotateX(0) rotateY(0) rotateZ(0)";
+	}
+	$touch.onmousemove = function(e){event = e;
+		if (startMouse.x){
+			if (e["changedTouches"])
+				e = e.changedTouches[0];
+
+			var x = (e.clientX - startMouse.x)/($active_zone.clientWidth/2);//100.;
+			var y = (startMouse.y - e.clientY)/($active_zone.clientHeight/2);//100.;
+
+			$x.innerText = ((x>= 0)? ((x>1)? 1: x) : ((x<-1)? -1: x)).toFixed(3);
+			$y.innerText = ((y>= 0)? ((y>1)? 1: y) : ((y<-1)? -1: y)).toFixed(3);
+
+			event.preventDefault();
+		}
+	}
+
+	window.addEventListener("deviceorientation", handleOrientation, true);
+	$touch.addEventListener("touchend", $touch.onmouseup, false);
+	$touch.addEventListener("touchstart", $touch.onmousedown, false);
+	$touch.addEventListener("touchmove", $touch.onmousemove, false);
+
+	function sendToRasPi(){
+		var x, y;
+		if (startMouse.x || Orientation){
+			x = !Orientation? $x.innerText : $a.innerText;
+			y = !Orientation? $y.innerText : /*$b*/$g.innerText;
+			ajax.open("GET", "http://"+raspiIpAddr+":3313/x="+x+"&y="+y+"&relative="+(!Orientation|0))
+			ajax.send()
+		}
+	}
+
+	function setTouchMode(){
+		Orientation = false;
+
+		$vector_orientation.style.display = "none";
+		$vector_touch.style.display = "block";
+		$active_zone.style.display="none";
+
+		$active_zone.style.background = "blue";
+	}
+
+	function setOrientationMode(){
+		Orientation = true;
+
+		startOrientation.alpha = alpha;
+		startOrientation.beta = beta;
+		startOrientation.gamma = gamma;
+
+		$vector_orientation.style.display = "block";
+		$vector_touch.style.display = "none";
+
+		$active_zone.style.display ="block";
+		$active_zone.style.background = "url(dummy.png)";
+		$active_zone.style.backgroundSize = "cover";
+		$active_zone.style.left = $touch.clientWidth/2 - $active_zone.clientWidth/2;
+		$active_zone.style.top = $touch.clientHeight/2 - $active_zone.clientHeight/2;
+	}
+
+	function handleOrientation(event) {
+
+		alpha = event.alpha.toFixed(1);
+		beta = _180to360(event.beta).toFixed(1);
+		gamma = _180to360(event.gamma).toFixed(1);
+
+		// relative values
+		var rel_alpha= _360to180(pymod(alpha-startOrientation.alpha, 360));
+		var rel_beta= _360to180(pymod(beta-startOrientation.beta, 360));
+		var rel_gamma= _360to180(pymod(gamma-startOrientation.gamma, 360));
+		
+		$a.innerText = rel_alpha.toFixed(1);
+		$b.innerText = rel_beta.toFixed(1);
+		$g.innerText = -rel_gamma.toFixed(1);
+
+		if (Orientation){
+			$active_zone.style.transform =
+				"perspective(1000px) rotateX("+
+				-rel_alpha
+				+"deg) rotateY("+
+				rel_gamma
+				+"deg) rotateZ("+
+				90
+				+"deg)";
+		}
+	}
+
+	function _180to360(deg){return deg < 0? 360+deg: deg;}
+	function _360to180(deg){return deg < 180? deg : deg-360;}
+	function pymod(value, mod){return value>=0? value%mod : mod+value%mod;}
+	function sign(value){return value >= 0? 1 : -1;}
+
+	setInterval(sendToRasPi, 100);
+</script>
+<head>
+	<title>SolidRaspi Stepper Motor Controller</title>
+	<meta name="viewport" content="initial-scale=1">
+</head>
+<body id="touch" style="background-color:black; color: white">
+	<h4 id="vector_orientation" style="display:none">vector: (<span id="a">0</span>, <span id="b">0</span>, <span id="g">-</span>)</h4>
+	<h4 id="vector_touch">vector: (<span id="x">0</span>, <span id="y">0</span>)</h4>
+	<div><button onclick="setTouchMode()" style="font-size: 20px;">Touch</button><button onclick="setOrientationMode()" style="font-size: 20px;">Orientation</button></div>
+	<div id="active_zone" style="background:blue; position:absolute; width:200px; height:200px; display:none"></div>
+</body>
+</html>

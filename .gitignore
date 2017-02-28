@@ -1,0 +1,7 @@
+*.pyc
+*.[oa]
+*~
+*.ipynb
+dist/
+*.egg-info/
+*.bash
