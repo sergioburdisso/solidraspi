@@ -2,4 +2,4 @@
 
 General purpose library for Raspberry Pi
 
-(I'm gonna start writing a decent documentation and README file soon!)
+(I'm gonna upload the API documentation and a good README file soon!)
